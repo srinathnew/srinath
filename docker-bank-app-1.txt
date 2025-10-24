@@ -1,0 +1,150 @@
+3 TIER APP ON MICRO SERVICES
+
+STEP-1: LAUNCH EC2 INSTANCE
+AMI : AMAZON LINUX KERNEL 5.10
+INSTANCE TYPE : T2.MICRO
+EBS : 25 GB 
+SECURITY GROUPS : ALL TRAFFIC
+
+STEP-2: CONNECT THE INSTANCE AND INSTALL DOCKER
+command: yum install docker -y && systemctl start docker
+
+STEP-3: INSTALL GIT AND GET THE CODE FROM GITHUB
+commands: 
+yum install git -y
+git clone https://github.com/devops0014/ltibbhackathon.git
+
+
+go to the folder and write Dockerfile for application
+ cd ltibbhackathon
+
+Now update all php files as 
+server (or) hostname as mysqldb
+username is root
+update these values on every php file
+
+vim Dockerfile
+go to inser mode (i)
+FROM php:7.4-apache
+RUN docker-php-ext-install mysqli
+COPY . /var/www/html/
+
+save and quit (:wq)
+
+Here our app docker file is ready lets build it
+
+STEP-4: BUILD THE APP DOCKERFILE SO WE WILL GET IMAGE
+command: docker build -t myapp .
+after that, check the image with docker images command, we will get myapp image.
+
+STEP-5:  LETS START WORK ON DATABASE
+create a folder : mkdir backend
+go to folder : cd  backend
+
+and create init.sql file and copy paste the queries
+vim init.sql 
+go to inser mode (i) and paste these queries
+Create database customers;
+
+use customers;
+
+create table donors(id int AUTO_INCREMENT primary key, fname varchar(255) NOT NULL , lname varchar(255) NOT NULL , mobileno BIGINT UNIQUE, city varchar(255) NOT NULL, bfrom date, bto date, dob date, bloodgroup varchar(255) NOT NULL);
+
+INSERT INTO donors (fname, lname, mobileno, city, bfrom, bto, dob, bloodgroup) VALUES ('Srikanth', 'Koraveni', '9000736060', 'Pune', '2022-09-28', '2022-12-28', '1998-05-22', 'O_Positive'), ('Prashanth', 'Katkam', '7989919097', 'Mumbai', '2022-09-17', '2022-11-18', '1998-09-30', 'O_Positive'), ('Kranthi', 'Khaitha', '9876789871', 'Bangalore', '2022-09-16', '2022-11-08', '1996-07-02', 'B_Positive'), ('Srinivas', 'Thota', '9812789411', 'Mumbai', '2022-09-18', '2022-10-31', '1992-07-22', 'O_Positive'), ('Pandya', 'Loka', '9877787887', 'Mumbai', '2022-09-18', '2022-10-09', '1992-07-22', 'B_Positive'), ('Prajodh', 'Shreya', '9812444411', 'Mumbai', '2022-08-23', '2022-10-31', '1992-07-22', 'B_Positive'), ('Srinivas', 'Thota', '9812723411', 'Mumbai', '2022-04-19', '2022-10-07', '1992-07-22', 'B_Positive'), ('Zaheer', 'Khan', '7788678987', 'Chennai', '2022-09-11', '2022-12-19', '1998-11-11', 'A_Positive');
+
+CREATE TABLE users ( username varchar(80) NOT NULL, name varchar(80) NOT NULL, password varchar(80) NOT NULL ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+INSERT INTO `users` (`username`, `name`, `password`) VALUES
+('yssyogesh', 'Yogesh Singh', '12345'),
+('bsonarika', 'Sonarika Bhadoria', '12345'),
+('vishal', 'Vishal Sahu', '12345'),
+('prashanth', 'Prashanth Katkam', '12345'),
+('vijay', 'Vijay mourya', '12345');
+
+INSERT INTO users (username, name, password) VALUES ('prashanth', 'Prashanth Katkam', '12345');
+
+CREATE TABLE admin ( username varchar(80) NOT NULL, name varchar(80) NOT NULL, password varchar(80) NOT NULL ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+INSERT INTO admin (username, name, password) VALUES ('admin', 'admin', '12345');
+
+
+GRANT ALL PRIVILEGES ON customers.* TO 'root'@'%' IDENTIFIED BY 'admin123';
+FLUSH PRIVILEGES;
+
+
+
+after that save and continue (:wq)
+
+NOW CREATE A DOCKER FILE FOR DATABASE
+vim Dockerfile
+go to inser mode (i)
+FROM mysql/mysql-server:5.7
+COPY init.sql /docker-entrypoint-initdb.d/
+ENV MYSQL_ROOT_PASSWORD=admin123
+
+save and continue (:wq)
+
+NOW BUILD THE DATABASE DOCKER FILE : docker build -t mydb .
+
+STEP-6: CREATE CONTAINERS USING THOSE 2 IMAGES
+
+create a volume : docker volume create database
+create database container :  docker run -itd --name mysqldb -v database:/mydb -p 3306:3306 mydb
+create app container : docker run -itd --name myapp -p 1234:80 --link mysqldb:mysqlcon myapp
+
+now access the application using public-ip:1234/index.html
+now create an account by clicking signup.php enter your username, name & password.
+
+so lets check weather all the details are getting stored on database
+command to check : 
+docker exec -it mysqldb bash
+mysql -u root -p
+it will ask the password : admin123
+use customers;
+select * from users;   -----> used to see users list
+select * from donors; ------> used to see donors list
+
+
+after that exit from the container 
+and delete all containers
+docker kill $(docker ps)
+docker container prune
+
+
+NOW TO MAKE AUTOMATION OF THIS PROJECT WE CAN USE DOCKER-COMPOSE FOR CREATING SERVICES INSTEAD OF CREATING THE CONTAINERS MANUALLY.
+
+SO LETS WRITE THE DOCKER-COMPOSE FILE
+
+vim docker-compose.ym;
+go to insert mode (i) 
+
+version: "3"
+services:
+ db:
+ container_name: mysqldb
+ image: mydb
+ ports:
+ - "3306:3306"
+
+ app:
+ container_name: myapp-container
+ image: myapp
+ ports:
+ - "8888:80"
+ depends_on:
+ - db
+
+INSTALL DOCKER-COMPOSE:
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+ls /usr/local/bin/
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose version
+
+
+EXECUTE DOCKER FILE:
+docker-compose up -d
+
+
+
+
